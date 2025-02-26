@@ -1,4 +1,4 @@
-package com.bitesimal.utils;
+package com.github.jersonsw.utils;
 
 public class NumberUtils {
     public static Number sum(Number a, Number b) {

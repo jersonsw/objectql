@@ -1,8 +1,8 @@
-package com.bitesimal.antlr4;
+package com.github.jersonsw.antlr4;
 
+import com.github.jersonsw.antlr4.exceptions.QueryEvaluationException;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
-import com.bitesimal.antlr4.exceptions.QueryEvaluationException;
 import org.antlr.v4.runtime.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

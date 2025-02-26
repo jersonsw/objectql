@@ -1,6 +1,6 @@
-package com.bitesimal.antlr4;
+package com.github.jersonsw.antlr4;
 
-import com.bitesimal.antlr4.exceptions.QueryEvaluationException;
+import com.github.jersonsw.antlr4.exceptions.QueryEvaluationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

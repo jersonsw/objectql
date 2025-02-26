@@ -5,7 +5,7 @@
 
   <groupId>com.github.jersonsw</groupId>
   <artifactId>objectql</artifactId>
-  <version>v0.2.0-alpha</version>
+  <version>v0.3.0-alpha</version>
   <packaging>jar</packaging>
   <name>ObjectQL</name>
   <description>A lightweight library for evaluating ObjectQL queries on object-oriented data structures.</description>
@@ -136,7 +136,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
-        <version>3.5.0</version>
+        <version>3.2.0</version>
         <executions>
           <execution>
             <id>add-source</id>

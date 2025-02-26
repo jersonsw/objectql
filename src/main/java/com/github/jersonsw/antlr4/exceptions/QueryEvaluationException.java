@@ -1,4 +1,4 @@
-package com.bitesimal.antlr4.exceptions;
+package com.github.jersonsw.antlr4.exceptions;
 
 public class QueryEvaluationException extends RuntimeException {
         public QueryEvaluationException(String message) {

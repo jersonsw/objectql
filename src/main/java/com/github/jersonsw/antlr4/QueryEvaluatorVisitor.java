@@ -1,5 +1,6 @@
-package com.bitesimal.antlr4;
+package com.github.jersonsw.antlr4;
 
+import com.github.jersonsw.utils.NumberUtils;
 import com.google.gson.Gson;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
@@ -15,8 +16,6 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import static com.bitesimal.utils.NumberUtils.*;
 
 /**
  * Visitor implementation for evaluating ObjectQL queries against an object.
@@ -720,12 +719,12 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
             String opr = ctx.opr.getText();
             System.out.println(opr + " / " + lhs + " | " + rhs);
             return switch (opr) {
-                case "+" -> sum(lhs, rhs);
-                case "-" -> subtract(lhs, rhs);
-                case "*" -> multiply(lhs, rhs);
-                case "/" -> divide(lhs, rhs);
-                case "%" -> mod(lhs, rhs);
-                case "^" -> pow(lhs, rhs);
+                case "+" -> NumberUtils.sum(lhs, rhs);
+                case "-" -> NumberUtils.subtract(lhs, rhs);
+                case "*" -> NumberUtils.multiply(lhs, rhs);
+                case "/" -> NumberUtils.divide(lhs, rhs);
+                case "%" -> NumberUtils.mod(lhs, rhs);
+                case "^" -> NumberUtils.pow(lhs, rhs);
                 default -> throw new IllegalArgumentException("Unknown arithmetic operator: " + opr);
             };
         }
