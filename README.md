@@ -83,15 +83,39 @@ System.out.println("Custom Function Query result: " + functionResult);
 ```
 
 ## Installation
-To use ObjectQL in your Java project, add the following dependency:
+To use ObjectQL in your Java project, add the following to your `pom.xml`:
 
 ```xml
+<!-- Add JitPack repository -->
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
 
-<dependency>
-    <groupId>com.bitesimalcom.bitesimal</groupId>
-    <artifactId>objectql</artifactId>
-    <version>1.0.0</version>
-</dependency>
+<!-- Add ObjectQL dependency -->
+<dependencies>
+    <dependency>
+        <groupId>com.github.jersonsw</groupId>
+        <artifactId>objectql</artifactId>
+        <version>v1.0.0</version>
+    </dependency>
+</dependencies>
+```
+
+Or if you're using Gradle:
+
+```groovy
+// Add JitPack repository
+repositories {
+    maven { url 'https://jitpack.io' }
+}
+
+// Add ObjectQL dependency
+dependencies {
+    implementation 'com.github.jersonsw:objectql:v1.0.0'
+}
 ```
 
 ## Usage Examples
@@ -116,4 +140,3 @@ Feel free to submit issues and pull requests to improve ObjectQL.
 
 ## License
 This project is licensed under the MIT License.
-

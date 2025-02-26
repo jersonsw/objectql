@@ -26,12 +26,6 @@
     </developer>
   </developers>
 
-  <scm>
-    <url>https://github.com/your-repo/objectql</url>
-    <connection>scm:git:git://github.com/your-repo/objectql.git</connection>
-    <developerConnection>scm:git:ssh://github.com/your-repo/objectql.git</developerConnection>
-  </scm>
-
   <properties>
     <maven.compiler.source>21</maven.compiler.source>
     <maven.compiler.target>21</maven.compiler.target>
