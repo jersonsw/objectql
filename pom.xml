@@ -3,9 +3,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.bitesimal</groupId>
+  <groupId>com.github.jersonsw</groupId>
   <artifactId>objectql</artifactId>
-  <version>1.0.0</version>
+  <version>v0.2.0-alpha</version>
   <packaging>jar</packaging>
   <name>ObjectQL</name>
   <description>A lightweight library for evaluating ObjectQL queries on object-oriented data structures.</description>
