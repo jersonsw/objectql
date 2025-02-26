@@ -159,9 +159,9 @@ public class QueryEvaluatorTest {
             if (args[0] == null) return null;
             return ((Number) args[0]).doubleValue() * 2;
         });
-        assertThat(QueryEvaluator.eval(data, "double(5) == 10.0", visitor)).isTrue();
-        assertThat(QueryEvaluator.eval(data, "double(age) == 50", visitor)).isTrue();
-        assertThatThrownBy(() -> QueryEvaluator.eval(data, "double(1, 2)", visitor))
+        assertThat(QueryEvaluator.eval(visitor, "double(5) == 10.0")).isTrue();
+        assertThat(QueryEvaluator.eval(visitor, "double(age) == 50")).isTrue();
+        assertThatThrownBy(() -> QueryEvaluator.eval(visitor, "double(1, 2)"))
                 .isInstanceOf(QueryEvaluationException.class)
                 .hasMessageContaining("Error evaluating query")
                 .hasCauseInstanceOf(IllegalArgumentException.class)
