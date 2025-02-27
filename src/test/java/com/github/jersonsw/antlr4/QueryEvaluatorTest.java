@@ -1,6 +1,7 @@
 package com.github.jersonsw.antlr4;
 
 import com.github.jersonsw.antlr4.exceptions.QueryEvaluationException;
+import com.google.gson.Gson;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -20,8 +21,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * </p>
  */
 public class QueryEvaluatorTest {
-    private Map<String, Object> data; // Test data for query evaluation
-    private QueryEvaluatorVisitor visitor; // Visitor instance for custom function tests
+    private static final Gson GSON = new Gson();
+    private Map<String, Object> data;
+    private QueryEvaluatorVisitor visitor;
+    private HashMap deepData;
+    private QueryEvaluatorVisitor deepVisitor;
 
     /**
      * Sets up test data and visitor before each test.
@@ -39,6 +43,57 @@ public class QueryEvaluatorTest {
         data.put("missing", null);        // Null property for null handling
         data.put("text", "Hello World");  // String property for text functions
         visitor = new QueryEvaluatorVisitor(data);
+
+        String deepJson = """
+                {
+                  "person": {
+                    "id": 12345,
+                    "name": "Alice Johnson",
+                    "age": 34,
+                    "contact": {
+                      "email": "alice.johnson@example.com",
+                      "phones": [
+                        {"type": "mobile", "number": "555-1234", "active": true},
+                        {"type": "home", "number": "555-5678", "active": false}
+                      ],
+                      "address": {
+                        "street": "123 Elm Street",
+                        "city": "Springfield",
+                        "zip": "62701",
+                        "coordinates": {
+                          "lat": 39.7817,
+                          "lon": -89.6501
+                        }
+                      }
+                    },
+                    "orders": [
+                      {
+                        "orderId": "ORD001",
+                        "total": 199.95,
+                        "items": [
+                          {"product": "Laptop", "price": 149.99, "quantity": 1},
+                          {"product": "Mouse", "price": 24.99, "quantity": 2}
+                        ],
+                        "status": "shipped"
+                      },
+                      {
+                        "orderId": "ORD002",
+                        "total": 75.50,
+                        "items": [
+                          {"product": "Keyboard", "price": 75.50, "quantity": 1}
+                        ],
+                        "status": "pending"
+                      }
+                    ],
+                    "preferences": {
+                      "notifications": true,
+                      "theme": "dark"
+                    }
+                  }
+                }
+                """;
+        deepData = GSON.fromJson(deepJson, HashMap.class);
+        deepVisitor = new QueryEvaluatorVisitor(deepJson);
     }
 
     /**
@@ -215,6 +270,103 @@ public class QueryEvaluatorTest {
     void testArrayAccess() {
         assertThat(eval("scores[1] == 20")).isTrue();
         assertThat(eval("scores[0] + 10 == 20")).isTrue();
+    }
+
+    /**
+     * Tests advanced queries with deep nesting and complex conditions on the deep dataset.
+     */
+    @Test
+    void testDeepNestedQueries() {
+        // Query 1: Active mobile phone and city match
+        assertThat(deepEval("person.contact.phones[0].active == true AND person.contact.address.city == 'Springfield'"))
+                .isTrue();
+
+        // Query 2: First order total exceeds 150 with a specific item
+        assertThat(deepEval("person.orders[0].total > 150 AND contains(person.orders[0].items[0].product, 'Laptop')"))
+                .isTrue();
+
+        // Query 3: Age plus latitude in range, email pattern match
+        assertThat(deepEval("(person.age + person.contact.address.coordinates.lat) >=< [70, 80] AND person.contact.email ~~ 'alice'"))
+                .isTrue();
+
+        // Query 4: Second order item price matches total, status check
+        assertThat(deepEval("person.orders[1].items[0].price == person.orders[1].total AND person.orders[1].status == 'pending'"))
+                .isTrue();
+    }
+
+    /**
+     * Tests complex logical combinations with arrays and functions on the deep dataset.
+     */
+    @Test
+    void testComplexLogicalAndArrayQueries() {
+        // Query 5: Multiple items in first order or low second order total, email prefix
+        assertThat(deepEval("(length(person.orders[0].items) > 1 OR person.orders[1].total < 100) AND startsWith(person.contact.email, 'alice')"))
+                .isTrue();
+
+        // Query 6: Phone number pattern and combined order total
+        assertThat(deepEval("(person.contact.phones[0].number ~ '555' OR person.contact.phones[1].number ~ '555') AND (person.orders[0].total + person.orders[1].total) > 250"))
+                .isTrue();
+
+        // Query 7: Array membership, math, and nested logic
+        assertThat(deepEval("(person.orders[0].status >+< ['shipped', 'delivered'] AND round(person.orders[0].items[1].price * person.orders[0].items[1].quantity) == 50) OR person.preferences.notifications == false"))
+                .isTrue();
+    }
+
+    /**
+     * Tests custom function with deep nesting on the deep dataset.
+     */
+    @Test
+    void testCustomFunctionWithDeepNesting() {
+        deepVisitor.registerFunction("distance", args -> {
+            if (args.length != 2) throw new IllegalArgumentException("distance requires 2 arguments: lat, lon");
+            if (args[0] == null || args[1] == null) return null;
+            double lat = ((Number) args[0]).doubleValue();
+            double lon = ((Number) args[1]).doubleValue();
+            return Math.sqrt(Math.pow(lat, 2) + Math.pow(lon, 2));
+        });
+
+        // Query 8: Distance check with high-value item
+        assertThat(QueryEvaluator.eval(deepVisitor,
+                "distance(person.contact.address.coordinates.lat, person.contact.address.coordinates.lon) < 100 AND person.orders[0].items[0].price > 100"))
+                .isTrue();
+
+        // Query 9: Distance range with text transformation
+        assertThat(QueryEvaluator.eval(deepVisitor,
+                "distance(person.contact.address.coordinates.lat, person.contact.address.coordinates.lon) >=< [0, 100] AND upper(person.orders[0].items[0].product) == 'LAPTOP'"))
+                .isTrue();
+    }
+
+    /**
+     * Tests edge cases with deep nesting and null handling on the deep dataset.
+     */
+    @Test
+    void testDeepNestingEdgeCases() {
+        assertThat(deepEval("person.contact.address.coordinates.missing > 10")).isFalse();
+
+        assertThat(deepEval("person.orders[2].total > 50"))
+                .isFalse();
+
+        assertThatThrownBy(() -> deepEval("(person.missing.field == 5 OR person.contact.phones[10].active == true) AND person.age > 30"))
+                .isInstanceOf(QueryEvaluationException.class)
+                .hasMessageContaining("Error evaluating query");
+    }
+
+    /**
+     * Tests scientific notation and complex math with deep nesting on the deep dataset.
+     */
+    @Test
+    void testScientificNotationAndComplexMath() {
+        // Query 13: Scientific notation with nested property
+        assertThat(deepEval("person.contact.address.coordinates.lat * 1.5^2 >=< [80, 90]"))
+                .isTrue();
+
+        // Query 14: Complex math with deep nesting and function
+        assertThat(deepEval("sqrt(person.orders[0].items[0].price) + person.contact.address.coordinates.lon * -1 > 0"))
+                .isTrue();
+    }
+
+    private Boolean deepEval(String query) {
+        return QueryEvaluator.eval(deepData, query);
     }
 
     /**

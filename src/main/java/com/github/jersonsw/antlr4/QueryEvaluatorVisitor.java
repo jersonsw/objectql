@@ -131,7 +131,11 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
         registerFunction("length", args -> {
             if (args.length != 1) throw new IllegalArgumentException("length requires 1 argument: string or array");
             if (args[0] == null) return null;
-            return args[0] instanceof String ? ((String) args[0]).length() : ((Object[]) args[0]).length;
+            if(args[0] instanceof String) return ((String) args[0]).length();
+            if(args[0] instanceof Object[]) return ((Object[]) args[0]).length;
+            if(args[0] instanceof List<?>) return ((List<?>) args[0]).size();
+
+            return 0;
         });
         registerFunction("contains", args -> {
             if (args.length != 2)
@@ -602,6 +606,7 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
                 return value;
             }
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+            System.out.println(e);
             LOG.debug("Identifier {} not found: {}", fieldPath, e.getMessage());
 
             return null; // Property not found or inaccessible
@@ -826,9 +831,18 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public Number visitNumber(ObjectQLParser.NumberContext ctx) {
+        if(ctx.POT() != null){
+            String[] pot = ctx.POT().getText().split("\\^");
+            if(pot.length != 2) throw new IllegalArgumentException("Invalid pow expression: " + ctx.POT().getText());
+
+            Number base = (pot[0].contains(".")) ? Double.parseDouble(pot[0]) : Integer.parseInt(pot[0]);
+            Number exp = (pot[1].contains(".")) ? Double.parseDouble(pot[1]) : Integer.parseInt(pot[1]);
+
+            return NumberUtils.pow(base, exp);
+        }
+
         String num = ctx.getText();
         try {
-
             if (num.contains(".")) return Double.valueOf(num);
 
             return Integer.valueOf(num);
