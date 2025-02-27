@@ -15,27 +15,12 @@ public class QueryEvaluator {
     private static final Gson GSON = new Gson();
 
     public static Boolean eval(Object input, String query) {
-        return eval(input, query, new QueryEvaluatorVisitor(input));
+
+        return eval(new QueryEvaluatorVisitor(input), query);
     }
 
-    public static Boolean eval(Object input, String query, QueryEvaluatorVisitor visitor) {
-        if (input == null) {
-            throw new IllegalArgumentException("Input cannot be null");
-        }
-        if (query == null || query.trim().isEmpty()) {
-            throw new IllegalArgumentException("Query cannot be null or empty");
-        }
-
-        Object evalInput = input;
-        if (input instanceof String jsonString) {
-            try {
-                evalInput = GSON.fromJson(jsonString, Object.class);
-                LOG.debug("Deserialized JSON input: {}", evalInput);
-            } catch (JsonSyntaxException e) {
-                throw new QueryEvaluationException("Invalid JSON input: " + e.getMessage(), e);
-            }
-        }
-
+    public static Boolean eval(QueryEvaluatorVisitor visitor, String query) {
+        if (query == null || query.trim().isEmpty()) throw new IllegalArgumentException("Query cannot be null or empty");
         ObjectQLLexer lexer = new ObjectQLLexer(CharStreams.fromString(query));
         CommonTokenStream tokens = new CommonTokenStream(lexer);
         ObjectQLParser parser = new ObjectQLParser(tokens);

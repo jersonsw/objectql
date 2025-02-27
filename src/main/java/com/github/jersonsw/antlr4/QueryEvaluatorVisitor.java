@@ -42,15 +42,23 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
     private final Map<String, Pattern> patternCache = new HashMap<>(); // Cache for regex patterns in text matching
     private final Map<String, Function<Object[], Object>> functionRegistry = new HashMap<>(); // Registry for user-defined functions
 
+    private static final Gson GSON = new Gson();
+
+    public QueryEvaluatorVisitor(String obj){
+        this(castInput(obj));
+    }
+
     /**
      * Constructs a new visitor with the target object to evaluate queries against.
      * Initializes a comprehensive set of built-in functions for common operations.
      *
-     * @param obj The object to query (e.g., Map, POJO, or deserialized JSON). Can be null,
+     * @param input The object to query (e.g., Map, POJO, or deserialized JSON). Can be null,
      *            in which case property lookups will return null.
      */
-    public QueryEvaluatorVisitor(Object obj) {
-        this.obj = obj;
+    public QueryEvaluatorVisitor(Object input) {
+        if (input == null) throw new IllegalArgumentException("Input cannot be null");
+
+        this.obj = input;
         // Register built-in functions for string manipulation
         registerFunction("replace", args -> {
             if (args.length != 3)
@@ -340,13 +348,9 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
     @Override
     public Boolean visitBetweenCond(ObjectQLParser.BetweenCondContext ctx) {
         Object valObj = ctx.val.accept(this);
-        System.out.println("Calling between cond => " + ctx.getText() + " => " + new Gson().toJson(valObj));
         Object fromObj = ctx.from.accept(this);
         Object toObj = ctx.to.accept(this);
-        System.out.println("VAL OBJ:" + valObj);
-        System.out.println("FROM OBJ:" + fromObj);
-        System.out.println("TO OBJ:" + toObj);
-        System.out.println(ctx.getText());
+
         if (valObj == null || fromObj == null || toObj == null) return false; // Null-safe handling
         if (!(valObj instanceof Number val) || !(fromObj instanceof Number from) || !(toObj instanceof Number to)) {
             throw new IllegalArgumentException("BETWEEN requires numeric values: " + ctx.getText());
@@ -401,9 +405,6 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
                 throw new IllegalArgumentException("IN/NOT_IN rhs must be a collection: " + ctx.getText());
             }
 
-            System.out.println(lhs);
-            System.out.println(rhsSet);
-
             boolean isPresent = rhsSet.contains(lhs);
 
             return (ctx.IN() != null) == isPresent;
@@ -427,8 +428,6 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
         if (ctx.bool_match != null) return (Boolean) ctx.bool_match.accept(this); // Boolean comparison
         Object lhsObj = ctx.lhs.accept(this);
         Object rhsObj = ctx.rhs.accept(this);
-        System.out.println("LHS -> " + lhsObj);
-        System.out.println("RHS -> " + rhsObj);
 
         if (lhsObj == null || rhsObj == null) return false; // Null-safe handling
         if (!(lhsObj instanceof Number lhs) || !(rhsObj instanceof Number rhs)) {
@@ -606,11 +605,13 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
             } else {
                 // Non-indexed path: use PropertyUtils directly
                 Object value = PropertyUtils.getProperty(obj, fieldPath);
+                System.out.printf("Testing it now: %s -> %s\n", fieldPath, value);
                 LOG.debug("Resolved non-indexed identifier {} to {}", fieldPath, value);
                 return value;
             }
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
             LOG.debug("Identifier {} not found: {}", fieldPath, e.getMessage());
+            System.out.println(e);
             return null; // Property not found or inaccessible
         } catch (Exception e) {
             LOG.debug("Error resolving identifier {}: {}", fieldPath, e.getMessage());
@@ -700,6 +701,7 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
         }
         if (ctx.idtfr != null) { // Property resolving to a number
             Object val = ctx.idtfr.accept(this);
+
             if (val == null) return null;
             if (val instanceof Number) return (Number) val;
 
@@ -717,7 +719,7 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
                 throw new IllegalArgumentException("Arithmetic requires numeric operands: " + ctx.getText());
             }
             String opr = ctx.opr.getText();
-            System.out.println(opr + " / " + lhs + " | " + rhs);
+
             return switch (opr) {
                 case "+" -> NumberUtils.sum(lhs, rhs);
                 case "-" -> NumberUtils.subtract(lhs, rhs);
@@ -834,10 +836,10 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
     public Number visitNumber(ObjectQLParser.NumberContext ctx) {
         String num = ctx.getText();
         try {
-            if (num.contains(".")) {
-                return Double.valueOf(num); // Decimal number
-            }
-            return Integer.valueOf(num); // Integer number
+
+            if (num.contains(".")) return Double.valueOf(num);
+
+            return Integer.valueOf(num);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Invalid number: " + num, e);
         }
@@ -881,5 +883,15 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
     @Override
     public Object visitErrorNode(ErrorNode errorNode) {
         return null; // Default implementation for error handling
+    }
+
+    private static Object castInput(Object input){
+        try {
+            if (input instanceof String) return GSON.fromJson((String) input, Object.class);
+
+            return input;
+        } catch (Exception e){
+            throw new IllegalArgumentException("The provided input is not an object nor a JSON string, but: \"" + input + "\"");
+        }
     }
 }
