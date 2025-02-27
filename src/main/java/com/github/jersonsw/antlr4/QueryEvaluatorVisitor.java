@@ -39,7 +39,7 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
     private static final Logger LOG = LoggerFactory.getLogger(QueryEvaluatorVisitor.class);
     private static final Pattern INDEX_PATTERN = Pattern.compile("\\[\\d+]"); // Simpler pattern to detect indexing
     private final Object obj; // The object to evaluate queries against
-    private final Map<String, Pattern> patternCache = new HashMap<>(); // Cache for regex patterns in text matching
+
     private final Map<String, Function<Object[], Object>> functionRegistry = new HashMap<>(); // Registry for user-defined functions
 
     private static final Gson GSON = new Gson();
@@ -470,16 +470,13 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
         String lhs = lhsObj.toString();
         String rhs = rhsObj.toString();
 
-        // Cache regex patterns for performance with LIKE operators
-        Pattern pattern = patternCache.computeIfAbsent(opr + rhs, k ->
-                Pattern.compile(rhs.replace("*", ".*").replace("?", "."),
-                        opr.contains("~~") ? Pattern.CASE_INSENSITIVE : 0));
-        boolean matches = pattern.matcher(lhs).matches();
         return switch (opr) {
             case "==" -> lhs.equals(rhs);
             case "!=" -> !lhs.equals(rhs);
-            case "~", "~~" -> matches; // LIKE and ILIKE (case-insensitive)
-            case "!~", "!~~" -> !matches; // NOT_LIKE and NOT_ILIKE (case-insensitive)
+            case "~" -> lhs.contains(rhs);
+            case "~~" -> lhs.toLowerCase().contains(rhs.toLowerCase());
+            case "!~" -> !lhs.contains(rhs);
+            case "!~~" -> !lhs.toLowerCase().contains(rhs.toLowerCase());
             default -> throw new IllegalArgumentException("Unknown text match operator: " + opr);
         };
     }

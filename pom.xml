@@ -5,7 +5,7 @@
 
   <groupId>com.github.jersonsw</groupId>
   <artifactId>objectql</artifactId>
-  <version>v0.6.0-alpha</version>
+  <version>v0.7.0-alpha</version>
   <packaging>jar</packaging>
   <name>ObjectQL</name>
   <description>A lightweight library for evaluating ObjectQL queries on object-oriented data structures.</description>

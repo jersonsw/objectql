@@ -81,10 +81,10 @@ public class QueryEvaluatorTest {
      */
     @Test
     void testQueryWithTextMatchCondition() {
-        assertThat(eval("name ~ 'John*'")).isTrue();    // LIKE
-        assertThat(eval("name ~~ 'john*'")).isTrue();   // ILIKE
-        assertThat(eval("name !~ 'Jane*'")).isTrue();   // NOT_LIKE
-        assertThat(eval("name !~~ 'JANE*'")).isTrue();  // NOT_ILIKE
+        assertThat(eval("name ~ 'John'")).isTrue();    // LIKE
+        assertThat(eval("name ~~ 'john'")).isTrue();   // ILIKE
+        assertThat(eval("name !~ 'Jane'")).isTrue();   // NOT_LIKE
+        assertThat(eval("name !~~ 'JANE'")).isTrue();  // NOT_ILIKE
         assertThat(eval("name == 'John Doe'")).isTrue(); // Equal
         assertThat(eval("name != 'Jane Doe'")).isTrue(); // Not equal
         assertThat(eval("missing ~ 'test'")).isFalse();  // Null handling
@@ -105,7 +105,7 @@ public class QueryEvaluatorTest {
      */
     @Test
     void testQueryWithLogicalOperators() {
-        assertThat(eval("age > 20 AND name ~ 'John*'")).isTrue(); // AND true
+        assertThat(eval("age > 20 AND name ~ 'John'")).isTrue(); // AND true
         assertThat(eval("age < 20 OR status == 'active'")).isTrue(); // OR true
         assertThat(eval("(age > 30 OR name == 'Jane Doe') AND isActive")).isFalse(); // Nested false
         assertThat(eval("age > 20 AND missing == 10")).isFalse(); // Null handling
