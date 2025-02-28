@@ -99,7 +99,7 @@ To use ObjectQL in your Java project, add the following to your `pom.xml`:
     <dependency>
         <groupId>com.github.jersonsw</groupId>
         <artifactId>objectql</artifactId>
-        <version>v0.8.0-alpha</version>
+        <version>v0.9.0-alpha</version>
     </dependency>
 </dependencies>
 ```
@@ -114,7 +114,7 @@ repositories {
 
 // Add ObjectQL dependency
 dependencies {
-    implementation 'com.github.jersonsw:objectql:v0.8.0-alpha'
+    implementation 'com.github.jersonsw:objectql:v0.9.0-alpha'
 }
 ```
 

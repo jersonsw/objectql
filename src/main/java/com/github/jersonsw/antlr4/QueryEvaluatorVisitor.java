@@ -9,13 +9,11 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import org.apache.commons.beanutils.PropertyUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Visitor implementation for evaluating ObjectQL queries against an object.
@@ -37,11 +35,9 @@ import java.util.stream.Collectors;
  */
 public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
     private static final Logger LOG = LoggerFactory.getLogger(QueryEvaluatorVisitor.class);
-    private static final Pattern INDEX_PATTERN = Pattern.compile("\\[\\d+]"); // Simpler pattern to detect indexing
-    private final Object obj; // The object to evaluate queries against
-
-    private final Map<String, Function<Object[], Object>> functionRegistry = new HashMap<>(); // Registry for user-defined functions
-
+    private static final Pattern INDEX_PATTERN = Pattern.compile("\\[\\d+]");
+    private final Object obj;
+    private final Map<String, Function<Object[], Object>> functionRegistry = new HashMap<>();
     private static final Gson GSON = new Gson();
 
     /**
@@ -49,110 +45,14 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      * Initializes a comprehensive set of built-in functions for common operations.
      *
      * @param input The object to query (e.g., Map, POJO, or deserialized JSON). Can be null,
-     *            in which case property lookups will return null.
+     * in which case property lookups will return null.
      */
     public QueryEvaluatorVisitor(Object input) {
         if (input == null) throw new IllegalArgumentException("Input cannot be null");
 
         this.obj = castInput(input);
 
-        // Register built-in functions for string manipulation
-        registerFunction("replace", args -> {
-            if (args.length != 3)
-                throw new IllegalArgumentException("replace requires 3 arguments: string, target, replacement");
-            if (args[0] == null || args[1] == null || args[2] == null) return null;
-            return ((String) args[0]).replaceAll((String) args[1], (String) args[2]);
-        });
-        registerFunction("upper", args -> {
-            if (args.length != 1) throw new IllegalArgumentException("upper requires 1 argument: string");
-            if (args[0] == null) return null;
-            return ((String) args[0]).toUpperCase();
-        });
-        registerFunction("lower", args -> {
-            if (args.length != 1) throw new IllegalArgumentException("lower requires 1 argument: string");
-            if (args[0] == null) return null;
-            return ((String) args[0]).toLowerCase();
-        });
-        registerFunction("substring", args -> {
-            if (args.length < 2 || args.length > 3)
-                throw new IllegalArgumentException("substring requires 2 or 3 arguments: string, start, [end]");
-            if (args[0] == null || args[1] == null) return null;
-            String str = (String) args[0];
-            int start = ((Number) args[1]).intValue();
-            int end = args.length == 3 && args[2] != null ? ((Number) args[2]).intValue() : str.length();
-            return str.substring(start, Math.min(end, str.length()));
-        });
-        registerFunction("concat", args -> {
-            if (args.length < 1) throw new IllegalArgumentException("concat requires at least 1 argument: strings");
-            return Arrays.stream(args).filter(Objects::nonNull)
-                    .map(Object::toString).reduce("", String::concat);
-        });
-
-        // Register built-in functions for numeric operations
-        registerFunction("min", args -> {
-            if (args.length < 1) throw new IllegalArgumentException("min requires at least 1 argument: numbers");
-            return Arrays.stream(args).filter(Objects::nonNull)
-                    .mapToDouble(a -> ((Number) a).doubleValue()).min()
-                    .orElseThrow(() -> new IllegalArgumentException("No valid numbers provided to min"));
-        });
-        registerFunction("max", args -> {
-            if (args.length < 1) throw new IllegalArgumentException("max requires at least 1 argument: numbers");
-            return Arrays.stream(args).filter(Objects::nonNull)
-                    .mapToDouble(a -> ((Number) a).doubleValue()).max()
-                    .orElseThrow(() -> new IllegalArgumentException("No valid numbers provided to max"));
-        });
-        registerFunction("abs", args -> {
-            if (args.length != 1) throw new IllegalArgumentException("abs requires 1 argument: number");
-            if (args[0] == null) return null;
-            return Math.abs(((Number) args[0]).doubleValue());
-        });
-        registerFunction("round", args -> {
-            if (args.length != 1) throw new IllegalArgumentException("round requires 1 argument: number");
-            if (args[0] == null) return null;
-            return Math.round(((Number) args[0]).doubleValue());
-        });
-        registerFunction("ceil", args -> {
-            if (args.length != 1) throw new IllegalArgumentException("ceil requires 1 argument: number");
-            if (args[0] == null) return null;
-            return Math.ceil(((Number) args[0]).doubleValue());
-        });
-        registerFunction("floor", args -> {
-            if (args.length != 1) throw new IllegalArgumentException("floor requires 1 argument: number");
-            if (args[0] == null) return null;
-            return Math.floor(((Number) args[0]).doubleValue());
-        });
-        registerFunction("sqrt", args -> {
-            if (args.length != 1) throw new IllegalArgumentException("sqrt requires 1 argument: number");
-            if (args[0] == null) return null;
-            return Math.sqrt(((Number) args[0]).doubleValue());
-        });
-
-        // Register built-in functions for text utilities
-        registerFunction("length", args -> {
-            if (args.length != 1) throw new IllegalArgumentException("length requires 1 argument: string or array");
-            if (args[0] == null) return null;
-            if(args[0] instanceof String) return ((String) args[0]).length();
-            if(args[0] instanceof Object[]) return ((Object[]) args[0]).length;
-            if(args[0] instanceof List<?>) return ((List<?>) args[0]).size();
-
-            return 0;
-        });
-        registerFunction("contains", args -> {
-            if (args.length != 2)
-                throw new IllegalArgumentException("contains requires 2 arguments: string, substring");
-            if (args[0] == null || args[1] == null) return false;
-            return ((String) args[0]).contains((String) args[1]);
-        });
-        registerFunction("startsWith", args -> {
-            if (args.length != 2) throw new IllegalArgumentException("startsWith requires 2 arguments: string, prefix");
-            if (args[0] == null || args[1] == null) return false;
-            return ((String) args[0]).startsWith((String) args[1]);
-        });
-        registerFunction("endsWith", args -> {
-            if (args.length != 2) throw new IllegalArgumentException("endsWith requires 2 arguments: string, suffix");
-            if (args[0] == null || args[1] == null) return false;
-            return ((String) args[0]).endsWith((String) args[1]);
-        });
+        registerFunctions();
     }
 
     /**
@@ -178,10 +78,13 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("Function name must not be null or empty");
         }
+
         if (fn == null) {
             throw new IllegalArgumentException("Function implementation must not be null");
         }
+
         functionRegistry.put(name, fn);
+
         LOG.debug("Registered function: {}", name);
     }
 
@@ -198,11 +101,8 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
     @Override
     public Boolean visitQuery(ObjectQLParser.QueryContext ctx) {
         LOG.debug("Evaluating query: {}", ctx.getText());
-        ObjectQLParser.PredicationContext predication = ctx.predication();
-        if (predication != null) {
-            return (Boolean) predication.accept(this);
-        }
-        throw new IllegalArgumentException("Query is invalid or empty");
+
+        return this.visitPredication(ctx.predication());
     }
 
     /**
@@ -218,26 +118,14 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
     @Override
     public Boolean visitPredication(ObjectQLParser.PredicationContext ctx) {
         LOG.debug("Evaluating predication: {}", ctx.getText());
-        // Base case: single condition
         if (ctx.condition() != null) {
-            return (Boolean) ctx.condition().accept(this);
+            return this.visitCondition(ctx.condition());
         }
-        ObjectQLParser.PredicationContext predication = ctx.predication();
-        if (predication == null) return false; // No predication to evaluate
 
-        Boolean left = (Boolean) predication.accept(this);
-        if (left == null) {
-            return false; // Null-safe fallback
-        }
-        // Combine with AND or OR if present
-        if (ctx.andNode() != null) {
-            Boolean right = (Boolean) ctx.andNode().accept(this);
-            return left && (right != null ? right : false);
-        }
-        if (ctx.orNode() != null) {
-            Boolean right = (Boolean) ctx.orNode().accept(this);
-            return left || (right != null ? right : false);
-        }
+        Boolean left = this.visitPredication(ctx.predication());
+        if (ctx.andNode() != null) return left && this.visitAndNode(ctx.andNode());
+        if (ctx.orNode() != null) return left || this.visitOrNode(ctx.orNode());
+
         return left;
     }
 
@@ -253,10 +141,7 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public Boolean visitAndNode(ObjectQLParser.AndNodeContext ctx) {
-        if (ctx.predication() == null || ctx.predication().isEmpty()) {
-            throw new IllegalArgumentException("Invalid AND condition: " + ctx.getText());
-        }
-        return (Boolean) ctx.predication().accept(this);
+        return this.visitPredication(ctx.predication());
     }
 
     /**
@@ -271,10 +156,7 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public Boolean visitOrNode(ObjectQLParser.OrNodeContext ctx) {
-        if (ctx.predication() == null || ctx.predication().isEmpty()) {
-            throw new IllegalArgumentException("Invalid OR condition: " + ctx.getText());
-        }
-        return (Boolean) ctx.predication().accept(this);
+        return this.visitPredication(ctx.predication());
     }
 
     /**
@@ -292,12 +174,19 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
     @Override
     public Boolean visitCondition(ObjectQLParser.ConditionContext ctx) {
         LOG.debug("Evaluating condition: {}", ctx.getText());
-        if (ctx.btw != null) return (Boolean) ctx.btw.accept(this); // Range check
-        if (ctx.in != null) return (Boolean) ctx.in.accept(this);   // Membership test
-        if (ctx.rel != null) return (Boolean) ctx.rel.accept(this); // Comparison
-        if (ctx.match != null) return (Boolean) ctx.match.accept(this); // Text matching
-        if (ctx.bool() != null) return (Boolean) ctx.bool().accept(this);   // Boolean literal
-        if (ctx.fn != null) return (Boolean) ctx.fn.accept(this);       // Function call
+
+        if (ctx.btw != null) return this.visitBetweenCond(ctx.btw); // Range check
+
+        if (ctx.in != null) return this.visitInCond(ctx.in);   // Membership test
+
+        if (ctx.rel != null) return this.visitRelCond(ctx.rel); // Comparison
+
+        if (ctx.match != null) return this.visitTextMatchCond(ctx.match); // Text matching
+
+        if (ctx.bool() != null) return this.visitBool(ctx.bool());   // Boolean literal
+
+        if (ctx.fn != null) return (Boolean) this.visitFunction(ctx.fn);       // Function call
+
         throw new IllegalArgumentException("Unrecognized condition: " + ctx.getText());
     }
 
@@ -313,7 +202,7 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public Object[] visitArgs(ObjectQLParser.ArgsContext ctx) {
-        return ctx.arg().stream().map(arg -> arg.accept(this)).toArray();
+        return ctx.arg().stream().map(this::visitArg).toArray();
     }
 
     /**
@@ -329,9 +218,9 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public Object visitArg(ObjectQLParser.ArgContext ctx) {
-        if (ctx.idtfr != null) return ctx.idtfr.accept(this); // Property value
-        if (ctx.txt != null) return ctx.txt.accept(this);     // Text literal or expression
-        if (ctx.math != null) return ctx.math.accept(this);   // Numeric expression
+        if (ctx.idtfr != null) return this.visitIdentifier(ctx.idtfr); // Property value
+        if (ctx.txt != null) return this.visitTextExpr(ctx.txt);     // Text literal or expression
+        if (ctx.math != null) return this.visitMathExpr(ctx.math);   // Numeric expression
         throw new IllegalArgumentException("Invalid function argument: " + ctx.getText());
     }
 
@@ -348,18 +237,15 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public Boolean visitBetweenCond(ObjectQLParser.BetweenCondContext ctx) {
-        Object valObj = ctx.val.accept(this);
-        Object fromObj = ctx.from.accept(this);
-        Object toObj = ctx.to.accept(this);
+        Number val = this.visitMathExpr(ctx.val);
+        Number from = this.visitMathExpr(ctx.from);
+        Number to = this.visitMathExpr(ctx.to);
 
-        if (valObj == null || fromObj == null || toObj == null) return false; // Null-safe handling
-        if (!(valObj instanceof Number val) || !(fromObj instanceof Number from) || !(toObj instanceof Number to)) {
-            throw new IllegalArgumentException("BETWEEN requires numeric values: " + ctx.getText());
-        }
-        double valD = val.doubleValue();
-        double fromD = from.doubleValue();
-        double toD = to.doubleValue();
-        return valD >= fromD && valD <= toD;
+        System.out.println("VAL: " + val + "; FROM: " + from + "; TO: " + to);
+
+        if(val == null || from == null || to == null) return false;
+
+        return val.doubleValue() >= from.doubleValue() && val.doubleValue() <= to.doubleValue();
     }
 
     /**
@@ -375,41 +261,45 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public Boolean visitInCond(ObjectQLParser.InCondContext ctx) {
-        if (ctx.lhsNum != null) { // Numeric IN/NOT_IN
-            Object lhsObj = ctx.lhsNum.accept(this);
-            if (lhsObj == null) return false;
-            if (!(lhsObj instanceof Number lhs)) {
-                throw new IllegalArgumentException("IN lhs must be numeric: " + ctx.getText());
-            }
-            Object[] rhs = (Object[]) ctx.rhsNum.accept(this);
-            if (rhs == null) return false;
-            Set<Number> rhsSet = new HashSet<>(Arrays.asList(Arrays.copyOf(rhs, rhs.length, Number[].class)));
-            boolean isPresent = rhsSet.contains(lhs);
-            return (ctx.IN() != null) == isPresent;
+        if (ctx.lhsNum != null) {
+            Number lhs = this.visitMathExpr(ctx.lhsNum);
+            Number[] rhs = (Number[]) this.visitNumericParams(ctx.rhsNum);
+            boolean contains = Arrays.asList(rhs).contains(lhs);
+
+            if(ctx.NOT_IN() != null) return !contains;
+
+            return contains;
         }
-        if (ctx.lhsText != null || ctx.lhs != null) { // Text IN/NOT_IN
-            Object lhsObj = ctx.lhsText != null ? ctx.lhsText.accept(this) : ctx.lhs.accept(this);
-            if (lhsObj == null) return false;
 
-            String lhs = lhsObj.toString();
-            Object rhsObj = ctx.lhsText != null ? ctx.rhsText.accept(this) : ctx.rhs.accept(this);
-            if (rhsObj == null) return false;
+        if (ctx.lhsText != null) {
+            String lhs = this.visitTextExpr(ctx.lhsText);
 
-            Set<Object> rhsSet;
-            if (rhsObj instanceof String[]) {
-                rhsSet = new HashSet<>(Arrays.asList((String[]) rhsObj));
-            } else if (rhsObj instanceof Object[]) {
-                rhsSet = Arrays.stream(((Object[]) rhsObj))
-                        .map(Object::toString)
-                        .collect(Collectors.toSet());
-            } else {
-                throw new IllegalArgumentException("IN/NOT_IN rhs must be a collection: " + ctx.getText());
-            }
+            Object[] params = this.visitStringParams(ctx.rhsText);
 
-            boolean isPresent = rhsSet.contains(lhs);
+            String[] rhs = Arrays.stream(params)
+                    .filter(obj -> obj instanceof String)
+                    .map(obj -> (String) obj)
+                    .toArray(String[]::new);
 
-            return (ctx.IN() != null) == isPresent;
+            boolean contains = Arrays.asList(rhs).contains(lhs);
+
+            if(ctx.NOT_IN() != null) return !contains;
+
+            return contains;
         }
+
+        if (ctx.lhs != null) {
+            String lhs = this.visitTextExpr(ctx.lhs);
+            String[] rhs = (String[]) this.visitIdentifier(ctx.rhs);
+
+            boolean contains = Arrays.asList(rhs).contains(lhs);
+
+            if(ctx.NOT_IN() != null) return !contains;
+
+            return contains;
+        }
+
+
         throw new IllegalArgumentException("Invalid IN condition: " + ctx.getText());
     }
 
@@ -426,14 +316,12 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public Boolean visitRelCond(ObjectQLParser.RelCondContext ctx) {
-        if (ctx.bool_match != null) return (Boolean) ctx.bool_match.accept(this); // Boolean comparison
-        Object lhsObj = ctx.lhs.accept(this);
-        Object rhsObj = ctx.rhs.accept(this);
+        if (ctx.bool_match != null) return this.visitBoolExpr(ctx.bool_match);
+        Number lhs = this.visitMathExpr(ctx.lhs);
+        Number rhs = this.visitMathExpr(ctx.rhs);
 
-        if (lhsObj == null || rhsObj == null) return false; // Null-safe handling
-        if (!(lhsObj instanceof Number lhs) || !(rhsObj instanceof Number rhs)) {
-            throw new IllegalArgumentException("Relational operators require numeric values: " + ctx.getText());
-        }
+        if(lhs == null || rhs == null) return false;
+
         return switch (ctx.opr.getText()) {
             case "==" -> lhs.doubleValue() == rhs.doubleValue();
             case "!=" -> lhs.doubleValue() != rhs.doubleValue();
@@ -458,21 +346,22 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public Boolean visitTextMatchCond(ObjectQLParser.TextMatchCondContext ctx) {
-        Object lhsObj = ctx.lhs.accept(this);
+        boolean lhsIsNil = ctx.lhs != null && ctx.lhs.nil != null;
+        boolean rhsIsNil = ctx.rhs != null && ctx.rhs.nil != null;
+
+        if(lhsIsNil && rhsIsNil) return true;
+
+        if(ctx.lhs == null || ctx.rhs == null) return false;
+
+        String lhs = this.visitTextExpr(ctx.lhs);
+        String rhs = this.visitTextExpr(ctx.rhs);
+
+        if(lhsIsNil) return rhs == null;
+        if(rhsIsNil) return lhs == null;
+
+        if(lhs == null || rhs == null) return false;
+
         String opr = ctx.opr.getText();
-
-        if (ctx.nilRhs != null) {
-            if (opr.equals("==")) return lhsObj == null;
-            if (opr.equals("!=")) return lhsObj != null;
-            throw new IllegalArgumentException("Invalid operator is used to compare with a null value: " + opr);
-        }
-
-        Object rhsObj = ctx.rhs.accept(this);
-
-        if (lhsObj == null || rhsObj == null) return false; // Null-safe handling
-
-        String lhs = lhsObj.toString();
-        String rhs = rhsObj.toString();
 
         return switch (opr) {
             case "==" -> lhs.equals(rhs);
@@ -485,25 +374,17 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
         };
     }
 
-    /**
-     * Evaluates a collection of parameters for IN/NOT_IN conditions.
-     * <p>
-     * Processes a list of text or numeric expressions, returning them as an array for membership testing.
-     * </p>
-     *
-     * @param ctx The paramsCollection context from the parser.
-     * @return Array of evaluated parameter values (e.g., String[], Number[]).
-     * @throws IllegalArgumentException if the collection type is invalid (neither text nor numeric).
-     */
     @Override
-    public Object[] visitParamsCollection(ObjectQLParser.ParamsCollectionContext ctx) {
-        if (!ctx.mathExpr().isEmpty()) {
-            return ctx.mathExpr().stream().map(expr -> expr.accept(this)).toArray(); // Numeric collection
-        }
-        if (!ctx.textExpr().isEmpty()) {
-            return ctx.textExpr().stream().map(expr -> expr.accept(this)).toArray(); // Text collection
-        }
-        throw new IllegalArgumentException("Invalid collection: " + ctx.getText());
+    public String[] visitStringParams(ObjectQLParser.StringParamsContext ctx) {
+        return ctx.textExpr()
+                .stream()
+                .map(this::visitTextExpr)
+                .toArray(String[]::new); // Text collection
+    }
+
+    @Override
+    public Number[] visitNumericParams(ObjectQLParser.NumericParamsContext ctx) {
+        return ctx.mathExpr().stream().map(this::visitMathExpr).toArray(Number[]::new); // Numeric collection
     }
 
     /**
@@ -519,19 +400,13 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public String visitTextExpr(ObjectQLParser.TextExprContext ctx) {
-        Object result;
-        if (ctx.fn != null) {
-            result = ctx.fn.accept(this); // Function call returning a string
-        } else if (ctx.txt != null) {
-            result = ctx.txt.accept(this); // Literal text
-        } else if (ctx.idtfr != null) {
-            result = ctx.idtfr.accept(this); // Property value
-        } else if (!ctx.textExpr().isEmpty()) {
-            result = ctx.textExpr().accept(this); // Nested text expression
-        } else {
-            throw new IllegalArgumentException("Invalid text expression: " + ctx.getText());
-        }
-        return result != null ? result.toString() : null;
+        if(ctx.nil != null) return null;
+        if (ctx.fn != null) return (String) this.visitFunction(ctx.fn);
+        if (ctx.txt != null) return this.visitText(ctx.txt);
+        if (ctx.idtfr != null) return (String) this.visitIdentifier(ctx.idtfr);
+        if (ctx.textExpr() != null) return this.visitTextExpr(ctx.textExpr());
+
+        throw new IllegalArgumentException("Invalid text expression: " + ctx.getText());
     }
 
     /**
@@ -548,32 +423,27 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public Boolean visitBoolExpr(ObjectQLParser.BoolExprContext ctx) {
-        if (ctx.bool() != null) {
-            return (Boolean) ctx.bool().accept(this); // Literal true/false
+        if(ctx.bool() != null) return this.visitBool(ctx.bool());
+        if(ctx.fn != null) return (Boolean) this.visitFunction(ctx.fn);
+        if(ctx.idtfr != null) return (Boolean) this.visitIdentifier(ctx.idtfr);
+        if(ctx.expr != null) return this.visitBoolExpr(ctx.expr);
+
+        Boolean lhs = null;
+        Boolean rhs = null;
+
+        if(ctx.lhs != null){
+            lhs = this.visitBoolExpr(ctx.lhs);
         }
-        if (ctx.idtfr != null) { // Property resolving to boolean
-            Object val = ctx.idtfr.accept(this);
-            return val instanceof Boolean ? (Boolean) val : Boolean.parseBoolean(val != null ? val.toString() : "false");
+
+        if(ctx.lhs != null){
+            rhs = this.visitBoolExpr(ctx.rhs);
         }
-        if (ctx.fn != null) {
-            return (Boolean) ctx.fn.accept(this); // Function returning boolean
-        }
-        if (ctx.lhs != null && ctx.opr != null && ctx.rhs != null) { // Boolean comparison
-            Object lhsObj = ctx.lhs.accept(this);
-            Object rhsObj = ctx.rhs.accept(this);
-            if (lhsObj == null || rhsObj == null) return false;
-            Boolean lhs = lhsObj instanceof Boolean ? (Boolean) lhsObj : Boolean.parseBoolean(lhsObj.toString());
-            Boolean rhs = rhsObj instanceof Boolean ? (Boolean) rhsObj : Boolean.parseBoolean(rhsObj.toString());
-            return switch (ctx.opr.getText()) {
-                case "==" -> lhs.equals(rhs);
-                case "!=" -> !lhs.equals(rhs);
-                default -> throw new IllegalArgumentException("Invalid boolean operator: " + ctx.opr.getText());
-            };
-        }
-        if (ctx.expr != null) {
-            return (Boolean) ctx.expr.accept(this); // Nested boolean expression
-        }
-        throw new IllegalArgumentException("Invalid boolean expression: " + ctx.getText());
+
+        return switch (ctx.opr.getText()) {
+            case "==" -> lhs == rhs;
+            case "!=" -> lhs != rhs;
+            default -> throw new IllegalArgumentException("Invalid boolean operator: " + ctx.opr.getText());
+        };
     }
 
     /**
@@ -589,9 +459,6 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public Object visitIdentifier(ObjectQLParser.IdentifierContext ctx) {
-        if (ctx.IDENTIFIER().isEmpty()) {
-            throw new IllegalArgumentException("Invalid identifier: " + ctx.getText());
-        }
         String fieldPath = ctx.getText();
 
         try {
@@ -606,7 +473,6 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
                 return value;
             }
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-            System.out.println(e);
             LOG.debug("Identifier {} not found: {}", fieldPath, e.getMessage());
 
             return null; // Property not found or inaccessible
@@ -693,44 +559,33 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public Number visitMathExpr(ObjectQLParser.MathExprContext ctx) {
-        if (ctx.num != null) {
-            return (Number) ctx.num.accept(this); // Numeric literal
-        }
-        if (ctx.idtfr != null) { // Property resolving to a number
-            Object val = ctx.idtfr.accept(this);
+        if (ctx.num != null) return this.visitNumber(ctx.num);
+        if(ctx.idtfr != null) {
+            Object value = this.visitIdentifier(ctx.idtfr);
 
-            if (val == null) return null;
-            if (val instanceof Number) return (Number) val;
+            if(value instanceof Number) return (Number) value;
 
-            LOG.warn("Identifier must resolve to a number: " + ctx.getText());
             return null;
         }
-        if (ctx.fn != null) {
-            return (Number) ctx.fn.accept(this); // Function returning a number
-        }
-        if (ctx.lhs != null && ctx.opr != null && ctx.rhs != null) { // Arithmetic operation
-            Object lhsObj = ctx.lhs.accept(this);
-            Object rhsObj = ctx.rhs.accept(this);
-            if (lhsObj == null || rhsObj == null) return null;
-            if (!(lhsObj instanceof Number lhs) || !(rhsObj instanceof Number rhs)) {
-                throw new IllegalArgumentException("Arithmetic requires numeric operands: " + ctx.getText());
-            }
-            String opr = ctx.opr.getText();
+        if (ctx.fn != null) return (Number) this.visitFunction(ctx.fn);
+        if(ctx.expr != null) return this.visitMathExpr(ctx.expr);
 
-            return switch (opr) {
-                case "+" -> NumberUtils.sum(lhs, rhs);
-                case "-" -> NumberUtils.subtract(lhs, rhs);
-                case "*" -> NumberUtils.multiply(lhs, rhs);
-                case "/" -> NumberUtils.divide(lhs, rhs);
-                case "%" -> NumberUtils.mod(lhs, rhs);
-                case "^" -> NumberUtils.pow(lhs, rhs);
-                default -> throw new IllegalArgumentException("Unknown arithmetic operator: " + opr);
-            };
-        }
-        if (ctx.expr != null) {
-            return (Number) ctx.expr.accept(this); // Nested math expression
-        }
-        throw new IllegalArgumentException("Invalid math expression: " + ctx.getText());
+        Number lhs = this.visitMathExpr(ctx.lhs);
+        Number rhs = this.visitMathExpr(ctx.rhs);
+
+        if(lhs == null || rhs == null) return null;
+
+        String opr = ctx.opr.getText();
+
+        return switch (opr) {
+            case "+" -> NumberUtils.sum(lhs, rhs);
+            case "-" -> NumberUtils.subtract(lhs, rhs);
+            case "*" -> NumberUtils.multiply(lhs, rhs);
+            case "/" -> NumberUtils.divide(lhs, rhs);
+            case "%" -> NumberUtils.mod(lhs, rhs);
+            case "^" -> NumberUtils.pow(lhs, rhs);
+            default -> throw new IllegalArgumentException("Unknown arithmetic operator: " + opr);
+        };
     }
 
     /**
@@ -747,14 +602,17 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public Object visitFunction(ObjectQLParser.FunctionContext ctx) {
-        String fnName = ctx.name.accept(this).toString();
-        Object[] args = ctx.args() != null ? (Object[]) ctx.args().accept(this) : new Object[0];
+        String fnName = this.visitFunctionName(ctx.name);
+        Object[] args = ctx.args() != null ? this.visitArgs(ctx.args()) : new Object[0];
         Function<Object[], Object> fn = functionRegistry.get(fnName);
+
         if (fn == null) {
             LOG.error("Unknown function '{}' invoked in query: {}", fnName, ctx.getText());
             throw new UnsupportedOperationException("Unknown function: " + fnName);
         }
+
         LOG.debug("Executing function {} with args: {}", fnName, Arrays.toString(args));
+
         try {
             return fn.apply(args);
         } catch (Exception e) {
@@ -831,24 +689,11 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public Number visitNumber(ObjectQLParser.NumberContext ctx) {
-        if(ctx.POT() != null){
-            String[] pot = ctx.POT().getText().split("\\^");
-            if(pot.length != 2) throw new IllegalArgumentException("Invalid pow expression: " + ctx.POT().getText());
+        if(ctx.int_() != null) return this.visitInt(ctx.int_());
+        if(ctx.float_() != null) return this.visitFloat(ctx.float_());
+        if(ctx.pot() != null) return this.visitPot(ctx.pot());
 
-            Number base = (pot[0].contains(".")) ? Double.parseDouble(pot[0]) : Integer.parseInt(pot[0]);
-            Number exp = (pot[1].contains(".")) ? Double.parseDouble(pot[1]) : Integer.parseInt(pot[1]);
-
-            return NumberUtils.pow(base, exp);
-        }
-
-        String num = ctx.getText();
-        try {
-            if (num.contains(".")) return Double.valueOf(num);
-
-            return Integer.valueOf(num);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Invalid number: " + num, e);
-        }
+        throw new IllegalArgumentException("Invalid number: " + ctx.getText());
     }
 
     /**
@@ -863,12 +708,11 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
      */
     @Override
     public String visitText(ObjectQLParser.TextContext ctx) {
-        return ctx.TEXT() != null ? ctx.TEXT().toString().replaceAll("['\"]", "") : "";
-    }
+        if(ctx.TEXT() == null) return null;
 
-    @Override
-    public Object visitNull(ObjectQLParser.NullContext ctx) {
-        return null;
+        String value = ctx.TEXT().toString();
+
+        return value.replaceAll("^'(.+)'$|^\"(.+)\"$", "$1");
     }
 
     @Override
@@ -891,6 +735,31 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
         return null; // Default implementation for error handling
     }
 
+    @Override
+    public Number visitPot(ObjectQLParser.PotContext ctx) {
+        Number base = this.visitPotTerm(ctx.base);
+        Number exponent = this.visitPotTerm(ctx.exponent);
+
+        return NumberUtils.pow(base, exponent);
+    }
+
+    @Override
+    public Number visitPotTerm(ObjectQLParser.PotTermContext ctx) {
+        if(ctx.int_() != null) return this.visitInt(ctx.int_());
+
+        return this.visitFloat(ctx.float_());
+    }
+
+    @Override
+    public Float visitFloat(ObjectQLParser.FloatContext ctx) {
+        return Float.valueOf(ctx.getText());
+    }
+
+    @Override
+    public Integer visitInt(ObjectQLParser.IntContext ctx) {
+        return Integer.parseInt(ctx.getText());
+    }
+
     private static HashMap castInput(Object input){
         try {
             if (input instanceof String) return GSON.fromJson((String) input, HashMap.class);
@@ -899,5 +768,177 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
         } catch (Exception e){
             throw new IllegalArgumentException("The provided input is not an object nor a JSON string, but: \"" + input + "\"");
         }
+    }
+
+    private void registerFunctions() {
+        registerFunction("replace", args -> {
+            if (args.length != 3) {
+                throw new IllegalArgumentException("replace requires 3 arguments: string, target, replacement");
+            }
+
+            if (args[0] == null || args[1] == null || args[2] == null) return null;
+
+            return ((String) args[0]).replaceAll((String) args[1], (String) args[2]);
+        });
+
+        registerFunction("upper", args -> {
+            if (args.length != 1) {
+                throw new IllegalArgumentException("upper requires 1 argument: string");
+            }
+
+            if (args[0] == null) return null;
+
+            return ((String) args[0]).toUpperCase();
+        });
+
+        registerFunction("lower", args -> {
+            if (args.length != 1) {
+                throw new IllegalArgumentException("lower requires 1 argument: string");
+            }
+
+            if (args[0] == null) return null;
+
+            return ((String) args[0]).toLowerCase();
+        });
+
+        registerFunction("substring", args -> {
+            if (args.length < 2 || args.length > 3) {
+                throw new IllegalArgumentException("substring requires 2 or 3 arguments: string, start, [end]");
+            }
+
+            if (args[0] == null || args[1] == null) return null;
+
+            String str = (String) args[0];
+            int start = ((Number) args[1]).intValue();
+            int end = args.length == 3 && args[2] != null ? ((Number) args[2]).intValue() : str.length();
+
+            return str.substring(start, Math.min(end, str.length()));
+        });
+
+        registerFunction("concat", args -> {
+            if (args.length < 1) {
+                throw new IllegalArgumentException("concat requires at least 1 argument: strings");
+            }
+
+            return Arrays.stream(args).filter(Objects::nonNull).map(Object::toString).reduce("", String::concat);
+        });
+
+        // Register built-in functions for numeric operations
+        registerFunction("min", args -> {
+            if (args.length < 1) {
+                throw new IllegalArgumentException("min requires at least 1 argument: numbers");
+            }
+
+            return Arrays.stream(args).filter(Objects::nonNull)
+                    .mapToDouble(a -> ((Number) a).doubleValue()).min()
+                    .orElseThrow(() -> new IllegalArgumentException("No valid numbers provided to min"));
+        });
+
+        registerFunction("max", args -> {
+            if (args.length < 1) {
+                throw new IllegalArgumentException("max requires at least 1 argument: numbers");
+            }
+
+            return Arrays.stream(args).filter(Objects::nonNull)
+                    .mapToDouble(a -> ((Number) a).doubleValue()).max()
+                    .orElseThrow(() -> new IllegalArgumentException("No valid numbers provided to max"));
+        });
+
+        registerFunction("abs", args -> {
+            if (args.length != 1) {
+                throw new IllegalArgumentException("abs requires 1 argument: number");
+            }
+
+            if (args[0] == null) return null;
+
+            return Math.abs(((Number) args[0]).doubleValue());
+        });
+
+        registerFunction("round", args -> {
+            if (args.length != 1) {
+                throw new IllegalArgumentException("round requires 1 argument: number");
+            }
+
+            if (args[0] == null) return null;
+
+            return Math.round(((Number) args[0]).doubleValue());
+        });
+
+        registerFunction("ceil", args -> {
+            if (args.length != 1) {
+                throw new IllegalArgumentException("ceil requires 1 argument: number");
+            }
+
+            if (args[0] == null) return null;
+
+            return Math.ceil(((Number) args[0]).doubleValue());
+        });
+
+        registerFunction("floor", args -> {
+            if (args.length != 1) {
+                throw new IllegalArgumentException("floor requires 1 argument: number");
+            }
+
+            if (args[0] == null) return null;
+
+            return Math.floor(((Number) args[0]).doubleValue());
+        });
+
+        registerFunction("sqrt", args -> {
+            if (args.length != 1) {
+                throw new IllegalArgumentException("sqrt requires 1 argument: number");
+            }
+
+            if (args[0] == null) return null;
+
+            return Math.sqrt(((Number) args[0]).doubleValue());
+        });
+
+        // Register built-in functions for text utilities
+        registerFunction("length", args -> {
+            if (args.length != 1) {
+                throw new IllegalArgumentException("length requires 1 argument: string or array");
+            }
+
+            if (args[0] == null) return null;
+
+            if(args[0] instanceof String) return ((String) args[0]).length();
+
+            if(args[0] instanceof Object[]) return ((Object[]) args[0]).length;
+
+            if(args[0] instanceof List<?>) return ((List<?>) args[0]).size();
+
+            return 0;
+        });
+
+        registerFunction("contains", args -> {
+            if (args.length != 2) {
+                throw new IllegalArgumentException("contains requires 2 arguments: string, substring");
+            }
+
+            if (args[0] == null || args[1] == null) return false;
+
+            return ((String) args[0]).contains((String) args[1]);
+        });
+
+        registerFunction("startsWith", args -> {
+            if (args.length != 2) {
+                throw new IllegalArgumentException("startsWith requires 2 arguments: string, prefix");
+            }
+
+            if (args[0] == null || args[1] == null) return false;
+
+            return ((String) args[0]).startsWith((String) args[1]);
+        });
+
+        registerFunction("endsWith", args -> {
+            if (args.length != 2) {
+                throw new IllegalArgumentException("endsWith requires 2 arguments: string, suffix");
+            }
+
+            if (args[0] == null || args[1] == null) return false;
+
+            return ((String) args[0]).endsWith((String) args[1]);
+        });
     }
 }

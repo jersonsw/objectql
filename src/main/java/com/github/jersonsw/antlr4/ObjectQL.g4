@@ -93,8 +93,8 @@ betweenCond
  * - id <> [1, 2, 3] checks if id is not in the list
  */
 inCond
-    : lhsText=textExpr (IN | NOT_IN) LBRACKET rhsText=paramsCollection RBRACKET    // Text membership
-    | lhsNum=mathExpr (IN | NOT_IN) LBRACKET rhsNum=paramsCollection RBRACKET      // Numeric membership
+    : lhsText=textExpr (IN | NOT_IN) LBRACKET rhsText=stringParams RBRACKET    // Text membership
+    | lhsNum=mathExpr (IN | NOT_IN) LBRACKET rhsNum=numericParams RBRACKET      // Numeric membership
     | lhs=textExpr (IN | NOT_IN) rhs=identifier                                    // Membership against identifier
     ;
 
@@ -117,20 +117,19 @@ relCond
  */
 textMatchCond
     : lhs=textExpr opr=(LIKE | ILIKE | NOT_LIKE | NOT_ILIKE | EQUAL_TO | DIFFERENT_FROM) rhs=textExpr
-    | lhs=textExpr opr=(EQUAL_TO | DIFFERENT_FROM) nilRhs=null
     ;
 
 /*
  * Collection of parameters for IN/NOT_IN conditions.
  * Can be text or numeric values.
  */
-paramsCollection
+stringParams
     : textExpr (COMMA textExpr)*                                                   // Text collection
-    | mathExpr (COMMA mathExpr)*                                                   // Numeric collection
     ;
 
-null:
-  NULL;
+numericParams
+    : mathExpr (COMMA mathExpr)*                                                   // Numeric collection
+    ;
 
 /*
  * Text expression evaluating to a string value.
@@ -141,6 +140,7 @@ textExpr
     | txt=text                                                                     // Literal string (e.g., "John")
     | idtfr=identifier                                                             // Property reference (e.g., name)
     | fn=function                                                                  // Function returning text (e.g., upper("john"))
+    | nil=NULL
     ;
 
 /*
@@ -203,7 +203,6 @@ aritOperator
     | MINUS                                 // -
     | TIMES                                 // *
     | DIVIDE                                // /
-    | POW                                   // ^
     | MOD                                   // %
     ;
 
@@ -217,9 +216,7 @@ aritOperator
  * - customer[@main].name
  */
 identifier
-    : IDENTIFIER ((LBRACKET (INSTANCE | INT) RBRACKET)? '.' IDENTIFIER)* LBRACKET (INSTANCE | INT) RBRACKET   // Complex path with final index
-    | IDENTIFIER ((LBRACKET (INSTANCE | INT) RBRACKET)? '.' IDENTIFIER)+                                      // Complex path
-    | IDENTIFIER                                                                                              // Simple identifier
+    : IDENTIFIER ( (LBRACKET (INSTANCE | int) RBRACKET)? '.' IDENTIFIER )* (LBRACKET (INSTANCE | int) RBRACKET)?
     ;
 
 /*
@@ -234,10 +231,27 @@ bool
  * Numeric literal in integer, decimal, or scientific notation formats.
  */
 number
-    : MINUS? INT                            // Integer (e.g., -42)
-    | DEC                                   // Decimal (e.g., 3.14)
-    | POT                                   // Scientific notation (e.g., 1.2^3)
+    : int                            // Integer (e.g., -42)
+    | float                          // Decimal (e.g., 3.14)
+    | pot                            // Scientific notation (e.g., 1.2^3)
     ;
+
+pot
+   : base=potTerm POW exponent=potTerm
+   ;
+
+potTerm
+    : int
+    | float
+    ;
+
+float
+   : int '.' dec=NATURAL
+   ;
+
+int
+   : MINUS? NATURAL
+   ;
 
 /*
  * Text literal enclosed in single or double quotes.
@@ -274,10 +288,7 @@ ILIKE: '~~';                                      // Case-insensitive text match
 NOT_LIKE: '!~';                                   // Negated text pattern match
 NOT_ILIKE: '!~~';                                 // Negated case-insensitive text match
 
-// Number Formats
-POT: (MINUS? INT | DEC) POW INT;                  // Scientific notation (e.g., 1.2^3)
-INT: DIGIT+;                                      // Integer
-DEC: MINUS? DIGIT+ '.' DIGIT+;                    // Decimal number
+NATURAL: DIGIT+;                                      // Integer
 
 // Arithmetic Operators
 PLUS: '+';
