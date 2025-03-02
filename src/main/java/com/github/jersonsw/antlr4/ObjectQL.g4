@@ -274,21 +274,21 @@ RBRACKET: ']';
 COMMA: ',';
 
 // Relational Operators
-EQUAL_TO: '==';                                  // Equal to
-LESS_THAN: '<';                                   // Less than
-GREATER_THAN: '>';                                // Greater than
-GREATER_THAN_OR_EQUAL_TO: '>=';                   // Greater than or equal to
-LESS_THAN_OR_EQUAL_TO: '<=';                      // Less than or equal to
-DIFFERENT_FROM: '!=';                             // Not equal to
-BETWEEN: '>=<';                                   // Between (inclusive)
-IN: '>+<';                                        // In collection
-NOT_IN: '<>';                                     // Not in collection
-LIKE: '~';                                        // Text pattern match
-ILIKE: '~~';                                      // Case-insensitive text match
-NOT_LIKE: '!~';                                   // Negated text pattern match
-NOT_ILIKE: '!~~';                                 // Negated case-insensitive text match
+EQUAL_TO: '==' | 'EQ';                          // Equal to
+LESS_THAN: '<' | 'LT';                          // Less than
+GREATER_THAN: '>' | 'GT';                       // Greater than
+GREATER_THAN_OR_EQUAL_TO: '>=' | 'GTE';         // Greater than or equal to
+LESS_THAN_OR_EQUAL_TO: '<=' | 'LTE';            // Less than or equal to
+DIFFERENT_FROM: '!=' | 'NE';                    // Not equal to
+BETWEEN: '>=<' | 'BETWEEN';                     // Between (inclusive)
+IN: '>+<' | 'IN';                               // In collection
+NOT_IN: '<>' | 'NOT IN';                        // Not in collection
+LIKE: '~' | 'LIKE';                     // Text pattern match
+ILIKE: '~~' | 'ILIKE';                  // Case-insensitive text match
+NOT_LIKE: '!~' | 'NOT LIKE';            // Negated text pattern match
+NOT_ILIKE: '!~~' | 'NOT ILIKE';         // Negated case-insensitive text match
 
-NATURAL: DIGIT+;                                      // Integer
+NATURAL: DIGIT+;                                // Integer
 
 // Arithmetic Operators
 PLUS: '+';
@@ -310,7 +310,7 @@ INSTANCE: '@' LETTER+;                            // Instance identifier (e.g., 
 IDENTIFIER: DOLLAR? (LETTER | '_')(LETTER | DIGIT | '_')*; // Standard identifier (e.g., $var_name)
 
 // Text Literals
-TEXT: (QUOTE (CHAR | SPACE)* ('*' | '?')? QUOTE) | (DOUBLE_QUOTE (CHAR | SPACE)* ('*' | '?')? DOUBLE_QUOTE); // Single or double-quoted string
+TEXT: (QUOTE '%'? (CHAR | SPACE)* '%'? QUOTE) | (DOUBLE_QUOTE '%'? (CHAR | SPACE)* '%'? DOUBLE_QUOTE); // Single or double-quoted string
 
 // Characters Allowed in Text Literals
 CHAR: LETTER | DIGIT | SIGN;

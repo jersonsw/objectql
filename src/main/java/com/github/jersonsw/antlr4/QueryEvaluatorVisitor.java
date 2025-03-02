@@ -366,10 +366,10 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
         return switch (opr) {
             case "==" -> lhs.equals(rhs);
             case "!=" -> !lhs.equals(rhs);
-            case "~" -> lhs.contains(rhs);
-            case "~~" -> lhs.toLowerCase().contains(rhs.toLowerCase());
-            case "!~" -> !lhs.contains(rhs);
-            case "!~~" -> !lhs.toLowerCase().contains(rhs.toLowerCase());
+            case "~" -> this.evaluateLike(lhs, rhs, false);
+            case "~~" -> this.evaluateLike(lhs, rhs, true);
+            case "!~" -> !this.evaluateLike(lhs, rhs, false);
+            case "!~~" -> !this.evaluateLike(lhs, rhs, true);
             default -> throw new IllegalArgumentException("Unknown text match operator: " + opr);
         };
     }
@@ -760,6 +760,37 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
         return Integer.parseInt(ctx.getText());
     }
 
+    private boolean evaluateLike(String string, String substring, boolean caseInsensitive){
+        boolean endsWithWildcard = substring.matches("^(.+)%$");
+        boolean startsWithWildcard = substring.matches("^%(.+)$");
+
+        if(startsWithWildcard && endsWithWildcard){
+            String toMatch = substring.substring(1, substring.length()-1);
+
+            if (caseInsensitive) return string.toLowerCase().contains(toMatch.toLowerCase());
+
+            return string.contains(toMatch);
+        }
+
+        if(startsWithWildcard){
+            String toMatch = substring.substring(1);
+
+            if (caseInsensitive) return string.toLowerCase().endsWith(toMatch.toLowerCase());
+
+            return string.endsWith(toMatch);
+        }
+
+        if(endsWithWildcard){
+            String toMatch = substring.substring(0, substring.length() - 1);
+
+            if (caseInsensitive) return string.toLowerCase().startsWith(toMatch.toLowerCase());
+
+            return string.startsWith(toMatch);
+        }
+
+        return string.equals(substring);
+    }
+
     private static HashMap castInput(Object input){
         try {
             if (input instanceof String) return GSON.fromJson((String) input, HashMap.class);
@@ -912,33 +943,48 @@ public class QueryEvaluatorVisitor implements ObjectQLVisitor<Object> {
         });
 
         registerFunction("contains", args -> {
-            if (args.length != 2) {
-                throw new IllegalArgumentException("contains requires 2 arguments: string, substring");
+            if (args.length < 2 || args.length > 3) {
+                throw new IllegalArgumentException("startsWith requires 2 or 3 arguments: string, substring and caseInsensitive flag");
             }
 
             if (args[0] == null || args[1] == null) return false;
 
-            return ((String) args[0]).contains((String) args[1]);
+            String string = (String) args[0];
+            String substring = (String) args[1];
+
+            if(args.length == 3 && args[2] == "true") return string.toLowerCase().contains(substring.toLowerCase());
+
+            return string.contains(substring);
         });
 
         registerFunction("startsWith", args -> {
-            if (args.length != 2) {
-                throw new IllegalArgumentException("startsWith requires 2 arguments: string, prefix");
+            if (args.length < 2 || args.length > 3) {
+                throw new IllegalArgumentException("startsWith requires 2 or 3 arguments: string, prefix and caseInsensitive flag");
             }
 
             if (args[0] == null || args[1] == null) return false;
 
-            return ((String) args[0]).startsWith((String) args[1]);
+            String val = (String) args[0];
+            String prefix = (String) args[1];
+
+            if(args.length == 3 && args[2] == "true") return val.toLowerCase().startsWith(prefix.toLowerCase());
+
+            return val.startsWith(prefix);
         });
 
         registerFunction("endsWith", args -> {
-            if (args.length != 2) {
-                throw new IllegalArgumentException("endsWith requires 2 arguments: string, suffix");
+            if (args.length < 2 || args.length > 3) {
+                throw new IllegalArgumentException("startsWith requires 2 or 3 arguments: string, prefix and caseInsensitive flag");
             }
 
             if (args[0] == null || args[1] == null) return false;
 
-            return ((String) args[0]).endsWith((String) args[1]);
+            String val = (String) args[0];
+            String suffix = (String) args[1];
+
+            if(args.length == 3 && args[2] == "true") return val.toLowerCase().endsWith(suffix.toLowerCase());
+
+            return val.endsWith(suffix);
         });
     }
 }

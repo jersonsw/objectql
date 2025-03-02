@@ -4,78 +4,114 @@
 
 ObjectQL is a powerful query language designed for evaluating conditions on object-oriented data structures. It provides an expressive syntax for logical operations, comparisons, range queries, collection membership, text pattern matching, and user-defined functions.
 
+ObjectQL queries are parsed and evaluated using the `QueryEvaluatorVisitor`, which walks through the query tree and evaluates conditions dynamically. It supports complex conditions, nested structures, and property path resolution using Apache Commons BeanUtils.
+
 ## Features
-- Logical operations: `AND`, `OR`, with parentheses for grouping
-- Comparisons: `<`, `>`, `<=`, `>=`, `==`, `!=` for numbers and booleans
-- Range queries: `BETWEEN` for inclusive numeric ranges
-- Collection membership: `IN`, `NOT_IN` for lists
-- Text matching: `LIKE (~)`, `ILIKE (~~)`, `NOT_LIKE (!~)`, `NOT_ILIKE (!~~)` with wildcards
-- User-defined functions: Extensible via function calls (e.g., `replace`, `min`)
-- Property paths: Dot notation and array indexing (e.g., `person.addresses[0].street`)
+- **Logical operations**: `AND`, `OR`, with parentheses for grouping
+- **Comparisons**: `<`, `>`, `<=`, `>=`, `==`, `!=` for numbers and booleans
+- **Range queries**: `BETWEEN` for inclusive numeric ranges
+- **Collection membership**: `IN`, `NOT_IN` for lists
+- **Text matching**: `LIKE (~)`, `ILIKE (~~)`, `NOT_LIKE (!~)`, `NOT_ILIKE (!~~)` with wildcards
+- **User-defined functions**: Extensible via function calls (e.g., `replace`, `min`)
+- **Property paths**: Dot notation and array indexing (e.g., `person.addresses[0].street`)
 
-## Operators
-### Logical Operators
-Logical operators allow combining multiple conditions:
-- `AND`: Both conditions must be true (`age > 30 AND status == 'active'`)
-- `OR`: At least one condition must be true (`age > 30 OR status == 'active'`)
-- Parentheses `()` allow grouping complex conditions (`(age > 30 OR age < 50) AND status == 'active'`)
+## Query Evaluation
+Queries are evaluated using `QueryEvaluatorVisitor`, which recursively processes conditions. Key features of the evaluation process:
 
-### Comparison Operators
-- `<` (Less than): `age < 30`
-- `>` (Greater than): `age > 30`
-- `<=` (Less than or equal to): `age <= 30`
-- `>=` (Greater than or equal to): `age >= 30`
-- `==` (Equal to): `status == 'active'`
-- `!=` (Not equal to): `status != 'inactive'`
+- **Short-circuiting**: `AND` and `OR` conditions are evaluated efficiently.
+- **Property path resolution**: Supports deep property access (e.g., `user.profile.age`).
+- **Error handling**: Logs errors and handles missing properties gracefully.
 
-### Range Queries
-- `BETWEEN`: `age >=< [18, 65]` checks if `age` is between 18 and 65 (inclusive)
-
-### Collection Membership
-- `IN`: `status >+< ['active', 'pending']` checks if `status` is in the list
-- `NOT_IN`: `status <> ['inactive', 'banned']` checks if `status` is not in the list
-
-### Text Matching
-- `LIKE (~)`: `name ~ 'Jo*'` matches any string starting with "Jo"
-- `ILIKE (~~)`: Case-insensitive version of LIKE (`name ~~ 'jo*'`)
-- `NOT_LIKE (!~)`: `name !~ 'Jo*'` ensures "Jo*" pattern is not matched
-- `NOT_ILIKE (!~~)`: Case-insensitive version of NOT LIKE
-
-## Nested Compound Conditions
-You can use parentheses to create complex conditions:
-```java
-String complexQuery = "((age > 25 AND status == 'active') OR (age < 18 AND status == 'pending'))";
-boolean complexResult = QueryEvaluator.eval(json, complexQuery);
-System.out.println("Complex Query result: " + complexResult);
+### Example Query on a Complex JSON Object
+#### JSON Data
+```json
+{
+  "person": {
+    "id": 12345,
+    "name": "Alice Johnson",
+    "age": 34,
+    "contact": {
+      "email": "alice.johnson@example.com",
+      "phones": [
+        {"type": "mobile", "number": "555-1234", "active": true},
+        {"type": "home", "number": "555-5678", "active": false}
+      ],
+      "address": {
+        "street": "123 Elm Street",
+        "city": "Springfield",
+        "zip": "62701",
+        "coordinates": {
+          "lat": 39.7817,
+          "lon": -89.6501
+        }
+      }
+    },
+    "orders": [
+      {
+        "orderId": "ORD001",
+        "total": 199.95,
+        "items": [
+          {"product": "Laptop", "price": 149.99, "quantity": 1},
+          {"product": "Mouse", "price": 24.99, "quantity": 2}
+        ],
+        "status": "shipped"
+      },
+      {
+        "orderId": "ORD002",
+        "total": 75.50,
+        "items": [
+          {"product": "Keyboard", "price": 75.50, "quantity": 1}
+        ],
+        "status": "pending"
+      }
+    ],
+    "preferences": {
+      "notifications": true,
+      "theme": "dark"
+    }
+  }
+}
 ```
-This ensures proper grouping and priority evaluation.
+
+#### Example Queries
+```java
+String query1 = "person.age > 30 AND person.contact.city == 'Springfield'";
+boolean result1 = QueryEvaluator.eval(json, query1);
+System.out.println("Query result: " + result1);
+
+String query2 = "person.orders[0].status == 'shipped' AND person.orders[1].total < 100";
+boolean result2 = QueryEvaluator.eval(json, query2);
+System.out.println("Query result: " + result2);
+```
 
 ## Built-in Functions
-ObjectQL provides several built-in functions for advanced querying:
+ObjectQL provides several built-in functions:
+
 ### String Functions
+```java
+visitor.registerFunction("upper", args -> ((String) args[0]).toUpperCase());
+visitor.registerFunction("concat", args -> args[0] + args[1]);
+```
 - `replace(string, target, replacement)`: Replaces occurrences of `target` with `replacement`
 - `upper(string)`: Converts a string to uppercase
 - `lower(string)`: Converts a string to lowercase
 - `substring(string, start, end)`: Extracts a substring
-- `concat(string1, string2, ...)`: Concatenates multiple strings
 - `contains(string, substring)`: Checks if `substring` exists in `string`
 - `startsWith(string, prefix)`: Checks if `string` starts with `prefix`
 - `endsWith(string, suffix)`: Checks if `string` ends with `suffix`
 
 ### Numeric Functions
+```java
+visitor.registerFunction("max", args -> Math.max((double) args[0], (double) args[1]));
+```
 - `min(value1, value2, ...)`: Returns the minimum value
 - `max(value1, value2, ...)`: Returns the maximum value
 - `abs(number)`: Returns the absolute value
 - `round(number)`: Rounds a number to the nearest integer
-- `ceil(number)`: Returns the smallest integer greater than or equal to `number`
-- `floor(number)`: Returns the largest integer less than or equal to `number`
 - `sqrt(number)`: Returns the square root
 
-### Length Functions
-- `length(string or array)`: Returns the length of a string or array
-
 ## Custom Functions
-You can register custom functions to extend ObjectQL.
+You can register your own functions to extend ObjectQL:
 ```java
 QueryEvaluatorVisitor visitor = new QueryEvaluatorVisitor(inputObject);
 visitor.registerFunction("double", args -> ((Number) args[0]).doubleValue() * 2);
@@ -88,7 +124,6 @@ System.out.println("Custom Function Query result: " + functionResult);
 To use ObjectQL in your Java project, add the following to your `pom.xml`:
 
 ```xml
-<!-- Add JitPack repository -->
 <repositories>
     <repository>
         <id>jitpack.io</id>
@@ -96,49 +131,33 @@ To use ObjectQL in your Java project, add the following to your `pom.xml`:
     </repository>
 </repositories>
 
-<!-- Add ObjectQL dependency -->
 <dependencies>
     <dependency>
         <groupId>com.github.jersonsw</groupId>
         <artifactId>objectql</artifactId>
-        <version>v0.9.0-alpha</version>
+        <version>v1.0.0</version>
     </dependency>
 </dependencies>
 ```
 
 Or if you're using Gradle:
-
 ```groovy
-// Add JitPack repository
 repositories {
     maven { url 'https://jitpack.io' }
 }
 
-// Add ObjectQL dependency
 dependencies {
-    implementation 'com.github.jersonsw:objectql:v0.9.0-alpha'
+    implementation 'com.github.jersonsw:objectql:v1.0.0'
 }
 ```
 
-## Usage Examples
-### Evaluating Nested JSON Objects
+## Debugging and Logging
+ObjectQL uses **SLF4J** for logging. You can enable debugging to inspect query evaluations:
 ```java
-String json = "{\"person\": {\"name\": \"John\", \"age\": 30, \"address\": {\"city\": \"New York\"}}}";
-String query = "person.age > 25 AND person.address.city == 'New York'";
-boolean result = QueryEvaluator.eval(json, query);
-System.out.println("Query result: " + result);
+private static final Logger LOG = LoggerFactory.getLogger(QueryEvaluatorVisitor.class);
+LOG.debug("Evaluating query: {}", query);
 ```
-
-### Evaluating Large JSON Payloads
-```java
-String largeJson = "{\"users\": [{\"id\":1, \"name\":\"Alice\"}, {\"id\":2, \"name\":\"Bob\"}]}";
-String largeQuery = "users[0].name == 'Alice' AND users[1].name == 'Bob'";
-boolean largeResult = QueryEvaluator.eval(largeJson, largeQuery);
-System.out.println("Large JSON Query result: " + largeResult);
-```
-
-## Contributing
-Feel free to submit issues and pull requests to improve ObjectQL.
+This helps diagnose issues when evaluating complex queries.
 
 ## License
 This project is licensed under the MIT License.

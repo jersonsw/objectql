@@ -136,10 +136,10 @@ public class QueryEvaluatorTest {
      */
     @Test
     void testQueryWithTextMatchCondition() {
-        assertThat(eval("name ~ 'John'")).isTrue();    // LIKE
-        assertThat(eval("name ~~ 'john'")).isTrue();   // ILIKE
-        assertThat(eval("name !~ 'Jane'")).isTrue();   // NOT_LIKE
-        assertThat(eval("name !~~ 'JANE'")).isTrue();  // NOT_ILIKE
+        assertThat(eval("name ~ 'John%'")).isTrue();    // LIKE
+        assertThat(eval("name ~~ 'john%'")).isTrue();   // ILIKE
+        assertThat(eval("name !~ 'Jane%'")).isTrue();   // NOT_LIKE
+        assertThat(eval("name !~~ '%JANE'")).isTrue();  // NOT_ILIKE
         assertThat(eval("name == 'John Doe'")).isTrue(); // Equal
         assertThat(eval("name != 'Jane Doe'")).isTrue(); // Not equal
         assertThat(eval("missing ~ 'test'")).isFalse();  // Null handling
@@ -160,7 +160,7 @@ public class QueryEvaluatorTest {
      */
     @Test
     void testQueryWithLogicalOperators() {
-        assertThat(eval("age > 20 AND name ~ 'John'")).isTrue(); // AND true
+        assertThat(eval("age > 20 AND name ~ 'John%'")).isTrue(); // AND true
         assertThat(eval("age < 20 OR status == 'active'")).isTrue(); // OR true
         assertThat(eval("(age > 30 OR name == 'Jane Doe') AND isActive")).isFalse(); // Nested false
         assertThat(eval("age > 20 AND missing == 10")).isFalse(); // Null handling
@@ -286,7 +286,7 @@ public class QueryEvaluatorTest {
                 .isTrue();
 
         // Query 3: Age plus latitude in range, email pattern match
-        assertThat(deepEval("(person.age + person.contact.address.coordinates.lat) >=< [70, 80] AND person.contact.email ~~ 'alice'"))
+        assertThat(deepEval("(person.age + person.contact.address.coordinates.lat) >=< [70, 80] AND person.contact.email ~~ 'alice%'"))
                 .isTrue();
 
         // Query 4: Second order item price matches total, status check
@@ -304,7 +304,7 @@ public class QueryEvaluatorTest {
                 .isTrue();
 
         // Query 6: Phone number pattern and combined order total
-        assertThat(deepEval("(person.contact.phones[0].number ~ '555' OR person.contact.phones[1].number ~ '555') AND (person.orders[0].total + person.orders[1].total) > 250"))
+        assertThat(deepEval("(person.contact.phones[0].number ~ '555%' OR person.contact.phones[1].number ~ '555%') AND (person.orders[0].total + person.orders[1].total) > 250"))
                 .isTrue();
 
         // Query 7: Array membership, math, and nested logic
